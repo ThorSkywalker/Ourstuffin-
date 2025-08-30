@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Furniture Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        canvas {
+            background-color: #fff;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .d-pad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 4px;
+            width: 120px;
+            height: 120px;
+        }
+        .d-pad-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            background-color: #e5e7eb;
+            border-radius: 8px;
+            color: #4b5563;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        .d-pad-button:hover {
+            background-color: #d1d5db;
+        }
+        .d-pad-up { grid-area: 1 / 2 / 2 / 3; }
+        .d-pad-left { grid-area: 2 / 1 / 3 / 2; }
+        .d-pad-center { grid-area: 2 / 2 / 3 / 3; background-color: transparent; }
+        .d-pad-right { grid-area: 2 / 3 / 3 / 4; }
+        .d-pad-down { grid-area: 3 / 2 / 4 / 3; }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="container bg-white rounded-xl shadow-lg p-6 w-full max-w-5xl flex flex-col md:flex-row gap-6">
+        
+        <!-- Controls and Information Panel -->
+        <div class="flex-none w-full md:w-1/3 flex flex-col space-y-4">
+            <h1 class="text-2xl font-bold text-gray-800">Furniture Planner</h1>
+            <p class="text-gray-600">Upload a floor plan, set the scale, and add furniture to visualize your space.</p>
+            
+            <!-- File Upload and Scaling -->
+            <div class="p-4 bg-gray-50 rounded-lg shadow-inner border border-gray-200">
+                <label class="block text-gray-700 font-semibold mb-2">1. Upload Floor Plan</label>
+                <input type="file" id="floorPlanInput" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100">
+                
+                <div class="mt-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Or, load from a URL</label>
+                    <input type="url" id="floorPlanUrlInput" placeholder="Enter image URL..." class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-violet-500 outline-none">
+                    <button id="loadUrlBtn" class="w-full mt-2 bg-violet-600 text-white font-bold py-2 px-4 rounded-full hover:bg-violet-700 transition-colors">Load Image</button>
+                </div>
+
+                <div class="mt-4">
+                    <label for="scaleInput" class="block text-gray-700 font-semibold">2. Set Scale (pixels per meter)</label>
+                    <p class="text-xs text-gray-500 mb-2">This app uses a conversion of 1m ≈ 39.37 inches. Set a value, e.g., 100, to represent how many pixels equal one meter.</p>
+                    <input type="number" id="scaleInput" value="100" class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-violet-500 outline-none">
+                </div>
+            </div>
+
+            <!-- Add Furniture -->
+            <div class="p-4 bg-gray-50 rounded-lg shadow-inner border border-gray-200">
+                <label class="block text-gray-700 font-semibold mb-2">3. Add Furniture</label>
+                <div class="flex flex-col space-y-2">
+                    <input type="text" id="furnitureNameInput" placeholder="Name (e.g., Sofa)" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-violet-500 outline-none">
+                    <input type="number" id="furnitureWidthInput" placeholder="Width (meters)" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-violet-500 outline-none">
+                    <input type="number" id="furnitureLengthInput" placeholder="Length (meters)" class="w-full p-2 border rounded-md focus:ring-2 focus:ring-violet-500 outline-none">
+                </div>
+                <button id="addFurnitureBtn" class="w-full mt-4 bg-violet-600 text-white font-bold py-2 px-4 rounded-full hover:bg-violet-700 transition-colors">Add Furniture</button>
+            </div>
+
+            <!-- Furniture Controls -->
+            <div class="p-4 bg-gray-50 rounded-lg shadow-inner border border-gray-200">
+                <label class="block text-gray-700 font-semibold mb-2">4. Furniture Controls</label>
+                <p class="text-xs text-gray-500 mb-2">Select an item on the canvas to use these controls.</p>
+                <button id="rotateBtn" class="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-600 transition-colors mb-2">Rotate Selected</button>
+                <p class="text-xs text-gray-500 mb-2">Use **arrow keys** or the D-pad to move the selected item.</p>
+                <div class="d-pad-grid mx-auto mt-4">
+                    <button class="d-pad-button d-pad-up" id="dPadUp">&uarr;</button>
+                    <div class="d-pad-center"></div>
+                    <button class="d-pad-button d-pad-left" id="dPadLeft">&larr;</button>
+                    <button class="d-pad-button d-pad-center"></button>
+                    <button class="d-pad-button d-pad-right" id="dPadRight">&rarr;</button>
+                    <button class="d-pad-button d-pad-down" id="dPadDown">&darr;</button>
+                </div>
+            </div>
+
+            <!-- Gemini-powered Suggestions -->
+            <div class="p-4 bg-gray-50 rounded-lg shadow-inner border border-gray-200">
+                <label class="block text-gray-700 font-semibold mb-2">5. Gemini-powered Suggestions</label>
+                <!-- Furniture Ideas Generator -->
+                <div class="mt-4">
+                    <p class="text-sm text-gray-600 mb-2">Generate furniture ideas for a room style:</p>
+                    <input type="text" id="ideaPromptInput" placeholder="e.g., 'modern living room'" class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-violet-500 outline-none">
+                    <button id="generateIdeasBtn" class="w-full mt-2 bg-pink-500 text-white font-bold py-2 px-4 rounded-full hover:bg-pink-600 transition-colors">Generate Ideas ✨</button>
+                    <div id="ideasOutput" class="mt-2 text-sm text-gray-700 p-2 bg-white rounded-md border border-gray-200 hidden"></div>
+                </div>
+
+                <!-- Custom Furniture Image Generator -->
+                <div class="mt-4">
+                    <p class="text-sm text-gray-600 mb-2">Generate a custom furniture image:</p>
+                    <input type="text" id="imagePromptInput" placeholder="e.g., 'a rustic wooden coffee table'" class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-violet-500 outline-none">
+                    <button id="generateImageBtn" class="w-full mt-2 bg-pink-500 text-white font-bold py-2 px-4 rounded-full hover:bg-pink-600 transition-colors">Generate Image ✨</button>
+                    <div id="imageOutput" class="mt-2 text-sm text-gray-700 p-2 bg-white rounded-md border border-gray-200 hidden">
+                        <img id="generatedImage" class="w-full h-auto rounded-md mb-2" style="display: none;">
+                        <button id="addImageBtn" class="w-full bg-violet-600 text-white font-bold py-2 px-4 rounded-full hover:bg-violet-700 transition-colors" style="display: none;">Add to Canvas</button>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <!-- Action Buttons -->
+            <div class="p-4 bg-gray-50 rounded-lg shadow-inner border border-gray-200">
+                <button id="clearBtn" class="w-full bg-red-500 text-white font-bold py-2 px-4 rounded-full hover:bg-red-600 transition-colors">Clear All</button>
+            </div>
+
+            <!-- Feedback Message Area -->
+            <div id="messageBox" class="p-3 bg-blue-100 text-blue-700 text-sm rounded-lg border border-blue-200" style="display: none;"></div>
+        </div>
+        
+        <!-- Canvas Area -->
+        <div class="flex-1 w-full flex flex-col items-center justify-center">
+            <canvas id="floorPlanCanvas" class="w-full h-auto rounded-lg" width="800" height="600"></canvas>
+            <div id="furnitureList" class="mt-4 p-4 w-full bg-gray-50 rounded-lg shadow-inner border border-gray-200 max-h-40 overflow-y-auto">
+                <p class="text-gray-500 text-sm">Added Furniture:</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Get all necessary DOM elements
+        const canvas = document.getElementById('floorPlanCanvas');
+        const ctx = canvas.getContext('2d');
+        const floorPlanInput = document.getElementById('floorPlanInput');
+        const floorPlanUrlInput = document.getElementById('floorPlanUrlInput');
+        const loadUrlBtn = document.getElementById('loadUrlBtn');
+        const scaleInput = document.getElementById('scaleInput');
+        const furnitureNameInput = document.getElementById('furnitureNameInput');
+        const furnitureWidthInput = document.getElementById('furnitureWidthInput');
+        const furnitureLengthInput = document.getElementById('furnitureLengthInput');
+        const addFurnitureBtn = document.getElementById('addFurnitureBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const messageBox = document.getElementById('messageBox');
+        const furnitureList = document.getElementById('furnitureList');
+        const rotateBtn = document.getElementById('rotateBtn');
+        const ideaPromptInput = document.getElementById('ideaPromptInput');
+        const generateIdeasBtn = document.getElementById('generateIdeasBtn');
+        const ideasOutput = document.getElementById('ideasOutput');
+        const imagePromptInput = document.getElementById('imagePromptInput');
+        const generateImageBtn = document.getElementById('generateImageBtn');
+        const imageOutput = document.getElementById('imageOutput');
+        const generatedImage = document.getElementById('generatedImage');
+        const addImageBtn = document.getElementById('addImageBtn');
+
+        // New D-pad buttons
+        const dPadUp = document.getElementById('dPadUp');
+        const dPadDown = document.getElementById('dPadDown');
+        const dPadLeft = document.getElementById('dPadLeft');
+        const dPadRight = document.getElementById('dPadRight');
+
+
+        // State variables
+        let floorPlanImage = null;
+        let furnitureItems = [];
+        let isDragging = false;
+        let selectedItem = null;
+        let dragOffset = { x: 0, y: 0 };
+        let currentScale = parseFloat(scaleInput.value);
+        let lastGeneratedImage = null;
+
+        // Firebase boilerplate (not currently used, but required for app type)
+        const __app_id = 'default-app-id';
+        const __firebase_config = '{}';
+        const __initial_auth_token = 'token';
+
+        // Helper functions
+        const showMessage = (message, type = 'info') => {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            
+            // Set colors based on message type
+            messageBox.className = 'p-3 text-sm rounded-lg border mt-4';
+            if (type === 'info') {
+                messageBox.classList.add('bg-blue-100', 'text-blue-700', 'border-blue-200');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-100', 'text-red-700', 'border-red-200');
+            }
+            
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        };
+
+        const getRandomColor = () => {
+            const colors = ['#3498db', '#2ecc71', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        };
+
+        const draw = () => {
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw floor plan image if it exists
+            if (floorPlanImage) {
+                const aspectRatio = floorPlanImage.width / floorPlanImage.height;
+                const canvasAspectRatio = canvas.width / canvas.height;
+                let drawWidth, drawHeight;
+
+                // Fit the image to the canvas while maintaining aspect ratio
+                if (aspectRatio > canvasAspectRatio) {
+                    drawWidth = canvas.width;
+                    drawHeight = drawWidth / aspectRatio;
+                } else {
+                    drawHeight = canvas.height;
+                    drawWidth = drawHeight * aspectRatio;
+                }
+
+                const x = (canvas.width - drawWidth) / 2;
+                const y = (canvas.height - drawHeight) / 2;
+                ctx.drawImage(floorPlanImage, x, y, drawWidth, drawHeight);
+            }
+
+            // Draw furniture items
+            furnitureItems.forEach(item => {
+                ctx.save();
+                ctx.translate(item.x + item.scaledWidth / 2, item.y + item.scaledHeight / 2);
+                ctx.rotate(item.rotation);
+                
+                if (item.image) {
+                    ctx.drawImage(item.image, -item.scaledWidth / 2, -item.scaledHeight / 2, item.scaledWidth, item.scaledHeight);
+                } else {
+                    ctx.fillStyle = item.color;
+                    ctx.fillRect(-item.scaledWidth / 2, -item.scaledHeight / 2, item.scaledWidth, item.scaledHeight);
+
+                    // Add text label
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '12px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const text = item.name || `${item.width} x ${item.length}`;
+                    ctx.fillText(text, 0, 0);
+                }
+
+                ctx.restore();
+
+                // Draw a border if it's the selected item
+                if (item === selectedItem) {
+                    ctx.strokeStyle = '#f1c40f';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(item.x, item.y, item.scaledWidth, item.scaledHeight);
+                }
+            });
+        };
+
+        const updateFurnitureList = () => {
+            furnitureList.innerHTML = '<p class="text-gray-500 text-sm">Added Furniture:</p>';
+            if (furnitureItems.length === 0) {
+                furnitureList.innerHTML += '<p class="text-gray-400 text-xs mt-2">No furniture added yet.</p>';
+            } else {
+                furnitureItems.forEach((item) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'flex items-center space-x-2 mt-2';
+                    if (!item.image) {
+                        const colorCircle = document.createElement('span');
+                        colorCircle.className = 'w-4 h-4 rounded-full';
+                        colorCircle.style.backgroundColor = item.color;
+                        itemDiv.appendChild(colorCircle);
+                    }
+                    const itemText = document.createElement('p');
+                    itemText.className = 'text-sm text-gray-700';
+                    itemText.textContent = `${item.name || 'Item'}`;
+                    itemDiv.appendChild(itemText);
+                    furnitureList.appendChild(itemDiv);
+                });
+            }
+        };
+
+        // API interaction functions
+        const generateFurnitureIdeas = async (prompt) => {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: `Suggest a list of 5 furniture items for a ${prompt} themed room. Please provide only a JSON array of strings, like this: ["item1", "item2", "item3"]` }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "ARRAY",
+                        items: {
+                            type: "STRING"
+                        }
+                    }
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+                    const json = result.candidates[0].content.parts[0].text;
+                    return JSON.parse(json);
+                } else {
+                    throw new Error("Invalid response format from API.");
+                }
+            } catch (error) {
+                console.error("Error generating ideas:", error);
+                showMessage("Failed to generate ideas. Please try again.", 'error');
+                return null;
+            }
+        };
+
+        const generateFurnitureImage = async (prompt) => {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+            const fullPrompt = `a top-down view of a single ${prompt} on a white background`;
+            const payload = { instances: [{ prompt: fullPrompt }], parameters: { sampleCount: 1 } };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                    return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                } else {
+                    throw new Error("Invalid image generation response.");
+                }
+            } catch (error) {
+                console.error("Error generating image:", error);
+                showMessage("Failed to generate image. Please try again.", 'error');
+                return null;
+            }
+        };
+
+
+        // Event listeners
+        floorPlanInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    floorPlanImage = img;
+                    draw();
+                    showMessage('Floor plan loaded from file.');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        loadUrlBtn.addEventListener('click', () => {
+            const imageUrl = floorPlanUrlInput.value.trim();
+            if (!imageUrl) {
+                showMessage('Please enter a valid image URL.', 'error');
+                return;
+            }
+
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            
+            img.onload = () => {
+                floorPlanImage = img;
+                draw();
+                showMessage('Floor plan loaded successfully from URL!');
+            };
+            
+            img.onerror = () => {
+                showMessage('Failed to load image from URL. It may not be a valid image or the server does not allow cross-origin requests.', 'error');
+                console.error('Error loading image from URL.');
+            };
+
+            img.src = imageUrl;
+        });
+
+        addFurnitureBtn.addEventListener('click', () => {
+            const name = furnitureNameInput.value.trim();
+            const width = parseFloat(furnitureWidthInput.value);
+            const length = parseFloat(furnitureLengthInput.value);
+            const scale = parseFloat(scaleInput.value);
+
+            if (!floorPlanImage) {
+                showMessage('Please upload a floor plan first.', 'error');
+                return;
+            }
+
+            if (isNaN(width) || isNaN(length) || width <= 0 || length <= 0) {
+                showMessage('Please enter valid width and length values.', 'error');
+                return;
+            }
+
+            const scaledWidth = width * scale;
+            const scaledHeight = length * scale;
+
+            const newItem = {
+                name,
+                width,
+                length,
+                scaledWidth,
+                scaledHeight,
+                x: 50,
+                y: 50,
+                color: getRandomColor(),
+                rotation: 0
+            };
+            furnitureItems.push(newItem);
+            draw();
+            updateFurnitureList();
+            showMessage('Furniture added! Drag it to move.');
+            
+            furnitureNameInput.value = '';
+            furnitureWidthInput.value = '';
+            furnitureLengthInput.value = '';
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            floorPlanImage = null;
+            furnitureItems = [];
+            draw();
+            updateFurnitureList();
+            showMessage('Canvas cleared.');
+            floorPlanInput.value = '';
+        });
+
+        scaleInput.addEventListener('change', () => {
+            currentScale = parseFloat(scaleInput.value);
+            furnitureItems.forEach(item => {
+                item.scaledWidth = item.width * currentScale;
+                item.scaledHeight = item.length * currentScale;
+            });
+            draw();
+            showMessage('Scale updated.');
+        });
+        
+        // New event listener for the Rotate button
+        rotateBtn.addEventListener('click', () => {
+            if (!selectedItem) {
+                showMessage('Please select a furniture item to rotate.', 'error');
+                return;
+            }
+
+            // Swap dimensions for a 90-degree rotation
+            const temp = selectedItem.scaledWidth;
+            selectedItem.scaledWidth = selectedItem.scaledHeight;
+            selectedItem.scaledHeight = temp;
+
+            // Update rotation value (for future functionality, although not used in current draw() logic)
+            selectedItem.rotation += Math.PI / 2;
+
+            draw();
+            showMessage('Furniture rotated 90 degrees.');
+        });
+        
+        generateIdeasBtn.addEventListener('click', async () => {
+            const prompt = ideaPromptInput.value.trim();
+            if (!prompt) {
+                showMessage("Please enter a room style to generate ideas.", "error");
+                return;
+            }
+
+            ideasOutput.classList.remove('hidden');
+            ideasOutput.textContent = "Generating ideas...";
+
+            const ideas = await generateFurnitureIdeas(prompt);
+            if (ideas) {
+                ideasOutput.innerHTML = '<strong>Suggestions:</strong><ul class="list-disc list-inside mt-1"></ul>';
+                const ul = ideasOutput.querySelector('ul');
+                ideas.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    ul.appendChild(li);
+                });
+            } else {
+                ideasOutput.textContent = "Could not generate ideas. Please try again.";
+            }
+        });
+
+        generateImageBtn.addEventListener('click', async () => {
+            const prompt = imagePromptInput.value.trim();
+            if (!prompt) {
+                showMessage("Please enter a description for the furniture.", "error");
+                return;
+            }
+
+            generatedImage.style.display = 'none';
+            addImageBtn.style.display = 'none';
+            imageOutput.classList.remove('hidden');
+            imageOutput.textContent = "Generating image...";
+
+            const imageUrl = await generateFurnitureImage(prompt);
+            if (imageUrl) {
+                lastGeneratedImage = new Image();
+                lastGeneratedImage.onload = () => {
+                    generatedImage.src = imageUrl;
+                    generatedImage.style.display = 'block';
+                    addImageBtn.style.display = 'block';
+                    imageOutput.textContent = "";
+                    showMessage("Image generated! Click 'Add to Canvas' to place it.", "info");
+                };
+                lastGeneratedImage.src = imageUrl;
+            } else {
+                imageOutput.textContent = "Could not generate image. Please try again.";
+            }
+        });
+
+        addImageBtn.addEventListener('click', () => {
+            if (!lastGeneratedImage) {
+                showMessage("No image to add. Please generate one first.", "error");
+                return;
+            }
+            if (!floorPlanImage) {
+                showMessage('Please upload a floor plan first.', 'error');
+                return;
+            }
+            const newItem = {
+                name: imagePromptInput.value || 'Generated Furniture',
+                width: lastGeneratedImage.width,
+                length: lastGeneratedImage.height,
+                scaledWidth: lastGeneratedImage.width * currentScale / 100, // Default scale to be adjusted by user
+                scaledHeight: lastGeneratedImage.height * currentScale / 100,
+                x: 50,
+                y: 50,
+                image: lastGeneratedImage,
+                rotation: 0
+            };
+            furnitureItems.push(newItem);
+            draw();
+            updateFurnitureList();
+            showMessage('Generated furniture added! Drag it to move.');
+        });
+        
+        // Canvas mouse events for dragging
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Find if a furniture item was clicked
+            selectedItem = null;
+            for (let i = furnitureItems.length - 1; i >= 0; i--) {
+                const item = furnitureItems[i];
+                if (mouseX > item.x && mouseX < item.x + item.scaledWidth &&
+                    mouseY > item.y && mouseY < item.y + item.scaledHeight) {
+                    isDragging = true;
+                    selectedItem = item;
+                    dragOffset.x = mouseX - item.x;
+                    dragOffset.y = mouseY - item.y;
+                    
+                    // Move the selected item to the top of the draw order
+                    furnitureItems.splice(i, 1);
+                    furnitureItems.push(selectedItem);
+                    draw();
+                    return;
+                }
+            }
+            draw(); // Redraw to remove selection border if click was outside a furniture item
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging && selectedItem) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                selectedItem.x = mouseX - dragOffset.x;
+                selectedItem.y = mouseY - dragOffset.y;
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Keyboard controls for moving selected item
+        window.addEventListener('keydown', (e) => {
+            if (selectedItem) {
+                const moveSpeed = 1; // Pixels to move per key press
+                switch (e.key) {
+                    case 'ArrowUp':
+                        selectedItem.y -= moveSpeed;
+                        break;
+                    case 'ArrowDown':
+                        selectedItem.y += moveSpeed;
+                        break;
+                    case 'ArrowLeft':
+                        selectedItem.x -= moveSpeed;
+                        break;
+                    case 'ArrowRight':
+                        selectedItem.x += moveSpeed;
+                        break;
+                }
+                draw();
+            }
+        });
+        
+        // D-pad button click handlers
+        const moveItem = (dx, dy) => {
+            if (selectedItem) {
+                const moveSpeed = 5;
+                selectedItem.x += dx * moveSpeed;
+                selectedItem.y += dy * moveSpeed;
+                draw();
+            }
+        };
+
+        dPadUp.addEventListener('click', () => moveItem(0, -1));
+        dPadDown.addEventListener('click', () => moveItem(0, 1));
+        dPadLeft.addEventListener('click', () => moveItem(-1, 0));
+        dPadRight.addEventListener('click', () => moveItem(1, 0));
+
+        // Initialize the app with a clean canvas
+        window.onload = () => {
+            draw();
+            updateFurnitureList();
+            showMessage('Welcome! Upload a floor plan to get started.');
+        };
+        
+        // Prevent default drag and drop behavior on the canvas
+        canvas.addEventListener('dragover', (e) => e.preventDefault());
+        canvas.addEventListener('drop', (e) => e.preventDefault());
+    </script>
+</body>
+</html>
